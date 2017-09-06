@@ -1,37 +1,37 @@
 import requests
-import json
 import NL_parse as nlp
 import matplotlib.pyplot as plt
 import pandas as pd
 import db_store as dbs
+import db_news as dbn
 
 
 def store_news(id, date, title):
     try:
-        dbs.store_news(id, date, title)
+        dbn.store_news(id, date, title)
     except:
         pass
 
 def retrieve_news(id):
     try:
-        dbs.retrieve_news()
+        dbn.retrieve_news()
     except:
         raise
 
 def run_per_token_analysis(tokens):
 
-    top_count = 10
+    top_count = 20
     #list of nouns
     nouns_tagged = [token for token in tokens if token[1].startswith('NN')]
     nouns_top10 = [(top10[0][0], top10[1]) for top10 in nlp.most_common_words(nouns_tagged, top_count)]
 
     #list of verbs
-    verbs_tagged = [token for token in tokens if token[1].startswith('VB')]
-    verbs_top10 = [(top10[0][0], top10[1]) for top10 in nlp.most_common_words(verbs_tagged, top_count)]
+    #verbs_tagged = [token for token in tokens if token[1].startswith('VB')]
+    #verbs_top10 = [(top10[0][0], top10[1]) for top10 in nlp.most_common_words(verbs_tagged, top_count)]
 
     #list of adjectives
-    adjectives_tagged = [token for token in tokens if token[1].startswith('J')]
-    adjectives_top10 = [(top10[0][0], top10[1]) for top10 in nlp.most_common_words(adjectives_tagged, top_count)]
+    #adjectives_tagged = [token for token in tokens if token[1].startswith('J')]
+    #adjectives_top10 = [(top10[0][0], top10[1]) for top10 in nlp.most_common_words(adjectives_tagged, top_count)]
 
     ## Plot the results
     ## Consider makint it a separtate function
@@ -39,16 +39,16 @@ def run_per_token_analysis(tokens):
     label_word = 'word'
 
     nouns_top10_df = pd.DataFrame(nouns_top10, columns=[label_word, label_count])
-    verbs_top10_df = pd.DataFrame(verbs_top10, columns=[label_word, label_count])
-    adjectives_top10_df = pd.DataFrame(adjectives_top10, columns=[label_word, label_count])
+    #verbs_top10_df = pd.DataFrame(verbs_top10, columns=[label_word, label_count])
+    #adjectives_top10_df = pd.DataFrame(adjectives_top10, columns=[label_word, label_count])
 
     plt.figure(1)
-    plt.subplot(311)
-    plt.bar(left=range(10), height=nouns_top10_df[label_count], color='#fca3fc', alpha=0.8, tick_label=nouns_top10_df[label_word])
-    plt.subplot(312)
-    plt.bar(left=range(10), height=verbs_top10_df[label_count], color='#ffaec9', alpha=0.8, tick_label=verbs_top10_df[label_word])
-    plt.subplot(313)
-    plt.bar(left=range(10), height=adjectives_top10_df[label_count], color='#f246c8', alpha=0.8, tick_label=adjectives_top10_df[label_word])
+    #plt.subplot(311)
+    plt.bar(left=range(top_count), height=nouns_top10_df[label_count], color='#fca3fc', alpha=0.8, tick_label=nouns_top10_df[label_word])
+    #plt.subplot(312)
+    #plt.bar(left=range(10), height=verbs_top10_df[label_count], color='#ffaec9', alpha=0.8, tick_label=verbs_top10_df[label_word])
+    #plt.subplot(313)
+    #plt.bar(left=range(10), height=adjectives_top10_df[label_count], color='#f246c8', alpha=0.8, tick_label=adjectives_top10_df[label_word])
     plt.show()
 
 def update_news_db():
@@ -59,8 +59,8 @@ def update_news_db():
     response=requests.get(url)
 
     try :
-        cursor = dbs.init_database()
-        max_id = dbs.get_max_id(cursor)
+        cursor = dbn.init_news_database("news.db")
+        max_id = dbn.get_max_id(cursor)
 
         ## Check GET response and if OK, read single news item
         if response.ok:
@@ -77,7 +77,7 @@ def update_news_db():
                     news.append((item_response.json()['id'], item_response.json()['title'], item_response.json()['time']))
 
         if len(news) > 0:
-            dbs.store_news_batch(cursor, news)
+            dbn.store_news_batch(cursor, news)
 
     finally:
         if cursor is not None:
@@ -88,16 +88,10 @@ def get_database_data(sql_filter = ""):
     titles = ' '
     cursor = None
 
-    try :
-        cursor = dbs.get_cursor()
-
-        raw_db_data = dbs.retrieve_news_titles(cursor, sql_filter)
-
+    with dbs.SQLCursor("news.db") as cursor:
+        raw_db_data = dbn.retrieve_news_titles(cursor, sql_filter)
         for title in raw_db_data:
-            titles += title[0] + " "
-    finally:
-        if cursor is not None:
-            cursor.connection.close()
+            titles += title[0] + ". "
 
     return titles
 
@@ -114,5 +108,5 @@ tagged_word_tokens = nlp.clean_and_tag_word_token(texts)
 run_per_token_analysis(tagged_word_tokens)
 
 ## 3. Tokenize texts to words and tag words. Next, run analysis showing 10 most popular words for nouns, verbs, adjectives
-## chunk_text = nlp.clean_and_chunk(texts)
+chunk_text = nlp.clean_and_chunk(texts)
 #run_per_chunk_analysis(tokens)

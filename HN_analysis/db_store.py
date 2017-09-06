@@ -1,49 +1,40 @@
 import sqlite3 as sq3
 
-def get_max_id(cursor) :
-    ex = cursor.execute("SELECT MAX(id) FROM News")
-    return ex.fetchone()
+class SQLCursor():
 
-def store_news_batch(cursor, news):
-    cursor.executemany("INSERT INTO News VALUES(?,?, datetime(?, 'unixepoch'))", news)
-    cursor.connection.commit()
+    def cleanup(self):
+        if self.connection is not None:
+            self.connection.close()
+            self.connection = None
+            self.cursor = None
 
-def retrieve_news_titles(cursor, sql_filter):
+    def open(self):
+        try:
+            self.connection = sq3.connect(self.filename)
+            self.cursor = self.connection.cursor()
+        except:
+            self.cleanup()
 
-    where_statement = ""
+    def __init__ (self, filename):
+        self.filename = filename
+        self.connection = None
+        self.cursor = None
 
-    if sql_filter is not "":
-        where_statement = " WHERE " + sql_filter
+    def __enter__ (self):
+        self.open()
+        return self
 
-    sql_query = "SELECT Title FROM News" + where_statement
+    def __exit__(self, *args):
+        self.cleanup()
 
-    ex = cursor.execute(sql_query)
+    def execute(self, query):
+        return self.cursor.execute(query)
 
-    return ex.fetchall()
+    def executemany(self, query, argtab):
+        return self.cursor.executemany(query, argtab)
 
-def get_cursor():
-    conn = None
-    cur = None
-    try:
-        conn = sq3.connect("news.db")
-        cur = conn.cursor()
-    except:
-        if conn is not None:
-            conn.close()
+    def getcursor(self):
+        return self.cursor
 
-    return cur
-
-def init_database():
-    cur = None
-
-    try:
-        cur = get_cursor()
-
-        cur.execute("CREATE TABLE IF NOT EXISTS News(Id INTEGER PRIMARY KEY, Title TEXT, PostTime DATETIME)")
-
-    except:
-        if cur is not None:
-            cur.connection.close()
-        raise
-
-    return cur
+    def getconnection(self):
+        return self.connection
